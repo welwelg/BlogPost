@@ -28,11 +28,11 @@ const initialState: PostsState = {
   totalCount: 0,
 };
 
-// HELPER: Upload Image Function
+// Upload Image Function
 const uploadImage = async (file: File) => {
   const fileName = `${Date.now()}-${file.name}`;
   
-  // FIX #1: Removed 'data' because it was unused
+  
   const { error } = await supabase.storage
     .from('blog-images')
     .upload(fileName, file);
@@ -88,7 +88,6 @@ export const createPost = createAsyncThunk(
       if (error) return rejectWithValue(error.message);
       return data;
     } catch (err) {
-      // FIX #2: Cast error safely instead of using 'any'
       return rejectWithValue((err as Error).message);
     }
   }
@@ -120,7 +119,6 @@ export const updatePost = createAsyncThunk(
           image_url = await uploadImage(imageFile);
         }
 
-        // FIX #3: Use 'Partial<Post>' instead of 'any' for better type safety
         const updates: Partial<Post> = { title, content };
         if (image_url) updates.image_url = image_url;
         
@@ -135,7 +133,6 @@ export const updatePost = createAsyncThunk(
         return data;
 
       } catch (err) {
-        // FIX #4: Cast error safely instead of using 'any'
         return rejectWithValue((err as Error).message);
       }
     }
