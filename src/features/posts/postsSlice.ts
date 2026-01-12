@@ -1,13 +1,14 @@
-import { createSlice, createAsyncThunk} from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { supabase } from '../../services/supabase';
 
-// Define Types (Para alam ni TS kung ano ang itsura ng Post)
+// Define Types
 export interface Post {
   id: number;
   title: string;
   content: string;
   user_id: string;
   user_email?: string;
+  image_url?: string;
   created_at: string;
 }
 
@@ -27,13 +28,30 @@ const initialState: PostsState = {
   totalCount: 0,
 };
 
+// HELPER: Upload Image Function
+const uploadImage = async (file: File) => {
+  const fileName = `${Date.now()}-${file.name}`;
+  
+  // FIX #1: Removed 'data' because it was unused
+  const { error } = await supabase.storage
+    .from('blog-images')
+    .upload(fileName, file);
+
+  if (error) throw new Error(error.message);
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('blog-images')
+    .getPublicUrl(fileName);
+
+  return publicUrl;
+};
+
 // FETCH POSTS with PAGINATION
 export const fetchPosts = createAsyncThunk(
   'posts/fetchPosts',
   async (page: number, { rejectWithValue }) => {
     const ITEMS_PER_PAGE = 3;
     
-    // Logic: Calculate range based on page
     const from = (page - 1) * ITEMS_PER_PAGE;
     const to = from + ITEMS_PER_PAGE - 1;
 
@@ -45,7 +63,6 @@ export const fetchPosts = createAsyncThunk(
 
     if (error) return rejectWithValue(error.message);
     
-    // Return both data and count
     return { data, count, page };
   }
 );
@@ -53,19 +70,31 @@ export const fetchPosts = createAsyncThunk(
 // CREATE POST
 export const createPost = createAsyncThunk(
   'posts/createPost',
-  async ({ title, content, user_id, user_email }: { title: string; content: string, user_id: string, user_email?: string }, { rejectWithValue }) => {
-    const { data, error } = await supabase
-      .from('posts')
-      .insert([{ title, content, user_id, user_email }])
-      .select()
-      .single(); 
+  async ({ title, content, user_id, user_email, imageFile }: { title: string; content: string, user_id: string, user_email?: string, imageFile?: File | null }, { rejectWithValue }) => {
+    
+    let image_url = null; 
+    
+    try {
+      if (imageFile) {
+        image_url = await uploadImage(imageFile);
+      }
 
-    if (error) return rejectWithValue(error.message);
-    return data;
+      const { data, error } = await supabase
+        .from('posts')
+        .insert([{ title, content, user_id, user_email, image_url }])
+        .select()
+        .single(); 
+
+      if (error) return rejectWithValue(error.message);
+      return data;
+    } catch (err) {
+      // FIX #2: Cast error safely instead of using 'any'
+      return rejectWithValue((err as Error).message);
+    }
   }
 );
 
-//  DELETE POST
+// DELETE POST
 export const deletePost = createAsyncThunk(
   'posts/deletePost',
   async (postId: number, { rejectWithValue }) => {
@@ -82,20 +111,37 @@ export const deletePost = createAsyncThunk(
 // UPDATE POST
 export const updatePost = createAsyncThunk(
     'posts/updatePost',
-    async ({ id, title, content }: { id: number; title: string; content: string }, { rejectWithValue }) => {
-      const { data, error } = await supabase
-        .from('posts')
-        .update({ title, content })
-        .eq('id', id)
-        .select()
-        .single();
+    async ({ id, title, content, imageFile }: { id: number; title: string; content: string, imageFile?: File | null }, { rejectWithValue }) => {
+      
+      let image_url;
+      
+      try {
+        if (imageFile) {
+          image_url = await uploadImage(imageFile);
+        }
+
+        // FIX #3: Use 'Partial<Post>' instead of 'any' for better type safety
+        const updates: Partial<Post> = { title, content };
+        if (image_url) updates.image_url = image_url;
+        
+        const { data, error } = await supabase
+          .from('posts')
+          .update(updates) 
+          .eq('id', id)
+          .select()
+          .single();
   
-      if (error) return rejectWithValue(error.message);
-      return data;
+        if (error) return rejectWithValue(error.message);
+        return data;
+
+      } catch (err) {
+        // FIX #4: Cast error safely instead of using 'any'
+        return rejectWithValue((err as Error).message);
+      }
     }
   );
 
-//  SLICE & REDUCERS
+// SLICE & REDUCERS
 const postsSlice = createSlice({
   name: 'posts',
   initialState,
@@ -113,19 +159,16 @@ const postsSlice = createSlice({
 
       // Create Post 
       .addCase(createPost.fulfilled, (state, action) => {
-        // Add the new post to the top of the list
         state.list.unshift(action.payload); 
       })
 
       // Delete Post 
       .addCase(deletePost.fulfilled, (state, action) => {
-        // Filter out the deleted post
         state.list = state.list.filter((post) => post.id !== action.payload);
       })
 
       // Update Post 
       .addCase(updatePost.fulfilled, (state, action) => {
-        // Find and replace the updated post
         const index = state.list.findIndex(post => post.id === action.payload.id);
         if (index !== -1) {
             state.list[index] = action.payload;

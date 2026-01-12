@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 
 const Dashboard = () => {
@@ -23,6 +24,7 @@ const Dashboard = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -49,7 +51,7 @@ const Dashboard = () => {
 
     if (editingId) {
       // UPDATE 
-      await dispatch(updatePost({ id: editingId, title, content }));
+      await dispatch(updatePost({ id: editingId, title, content, imageFile }));
       setEditingId(null);
       toast.success("Post Updated", { 
         description: "Your changes have been saved successfully." 
@@ -59,15 +61,18 @@ const Dashboard = () => {
         title, 
         content, 
         user_id: user.id, 
-        user_email: user.email 
+        user_email: user.email,
+        imageFile
+
       }));
       toast.success("Post Published", { 
         description: "Your new blog post is now live!" 
       });
     }
-    
+    setEditingId(null);
     setTitle('');
     setContent('');
+    setImageFile(null);
   };
 
   const handleEdit = (post: Post) => {
@@ -116,7 +121,7 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start pb-10">
-        <div className="md:col-span-1 sticky top-32">
+        <div className="md:col-span-1 md:sticky md:top-32">
           <Card className="shadow-md border-t-4 border-t-black">
             <CardHeader>
               <CardTitle>{editingId ? 'Edit Post' : 'Create New Post'}</CardTitle>
@@ -144,9 +149,25 @@ const Dashboard = () => {
                     required 
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="image">Cover Image (Optional)</Label>
+                  <Input 
+                    id="image" 
+                    type="file" 
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) setImageFile(e.target.files[0]);
+                    }} 
+                  />
+                </div>
                 
                 <div className="flex gap-2 pt-2">
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button 
+                    type="submit" 
+                    className={editingId ? "flex-1" : "w-full"} 
+                    disabled={loading}
+                  >
                     {loading ? 'Saving...' : (editingId ? 'Update Post' : 'Publish Post')}
                   </Button>
                   
@@ -154,7 +175,8 @@ const Dashboard = () => {
                     <Button 
                       type="button" 
                       variant="outline" 
-                      onClick={() => { setEditingId(null); setTitle(''); setContent(''); }}
+                      className="flex-1"
+                      onClick={() => { setEditingId(null); setTitle(''); setContent(''); setImageFile(null); }}
                     >
                       Cancel
                     </Button>
@@ -179,40 +201,64 @@ const Dashboard = () => {
               No posts yet. Start writing on the left!
             </div>
           ) : (
-            <div className="grid gap-6">
+            <div className="flex flex-col gap-6">
               {list.map((post) => (
-                <Card key={post.id} className="transition-all hover:shadow-lg border-l-4 border-l-transparent hover:border-l-black">
-              
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-xl mb-2">{post.title}</CardTitle>
-                        <div className="text-xs text-gray-400 flex items-center gap-2">
-                          <span className="font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
-                            {post.user_email ? post.user_email.split('@')[0] : 'Unknown User'}
-                          </span>
-                          <span>•</span>
-                          <span>{formatDate(post.created_at)}</span>
+                <Card key={post.id} className="flex flex-col sm:flex-row overflow-hidden transition-all hover:shadow-lg border-l-4 border-l-transparent hover:border-l-black">
+                   
+                   {/* Left Side */}
+                   {post.image_url && (
+                      <div className="relative w-full sm:w-80 sm:shrink-0 bg-gray-200 border-r border-gray-100">
+                          <img 
+                          src={post.image_url} 
+                          alt={post.title} 
+                          className="w-full h-64 sm:h-full object-cover transition-transform hover:scale-105 duration-500" 
+                          />
+                      </div>
+                    )}
+
+                  {/* Right Side: Content */}
+                  <div className="flex flex-col grow">
+                    <CardHeader className="pb-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <Link to={`/post/${post.id}`} className="hover:underline hover:text-blue-600 transition-colors">
+                            <CardTitle className="text-xl">{post.title}</CardTitle>
+                          </Link>
+                          <div className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
+                            <span className="font-medium bg-gray-100 px-2 py-0.5 rounded-full text-gray-600">
+                              {post.user_email ? post.user_email.split('@')[0] : 'Unknown User'}
+                            </span>
+                            <span>•</span>
+                            <span>{formatDate(post.created_at)}</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardHeader>
+                    </CardHeader>
 
-                  <CardContent>
-                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                  </CardContent>
-                  
-                  {/* ACTIONS */}
-                  {user && user.id === post.user_id && (
-                    <CardFooter className="flex justify-end gap-2 bg-gray-50/30 p-3">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(post)}>
-                        Edit
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => handleDelete(post.id)}>
-                        Delete
-                      </Button>
+                    <CardContent className="grow py-2">
+                      <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed">
+                        {post.content}
+                      </p>
+                    </CardContent>
+                    
+                    {/* Footer Actions */}
+                    <CardFooter className="pt-2 pb-6 flex justify-between items-center gap-4">
+                      <Link to={`/post/${post.id}`} className="text-sm font-semibold text-blue-600 hover:underline">
+                         Read more →
+                      </Link>
+
+                      {user && user.id === post.user_id && (
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(post)}>
+                            Edit
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={() => handleDelete(post.id)}>
+                            Delete
+                          </Button>
+                        </div>
+                      )}
                     </CardFooter>
-                  )}
+                  </div>
                 </Card>
               ))}
             </div>

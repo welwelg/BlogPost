@@ -1,10 +1,7 @@
-// 1. IMPORT REACT HOOKS
 import { useState, useEffect } from 'react'; 
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
-// 2. IMPORT USEDISPATCH
 import { useDispatch } from 'react-redux'; 
-
+import PostDetails from './pages/PostDetails';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { setUser } from './features/auth/authSlice'; 
@@ -54,6 +51,7 @@ function App() {
         
         {/* Protected Dashboard */}
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/post/:id" element={<PostDetails />} />
       </Routes>
       <Toaster position="top-right" richColors />
     </Router>
