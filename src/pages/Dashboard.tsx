@@ -11,6 +11,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { MessageSquare, MoreVertical, Pencil, Trash } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const Dashboard = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -243,19 +250,41 @@ const Dashboard = () => {
                     
                     {/* Footer Actions */}
                     <CardFooter className="pt-2 pb-6 flex justify-between items-center gap-4">
-                      <Link to={`/post/${post.id}`} className="text-sm font-semibold text-blue-600 hover:underline">
-                         Read more →
-                      </Link>
+                     <div className="flex gap-4 items-center">
+                        <Link to={`/post/${post.id}`} className="text-sm font-semibold text-blue-600 hover:underline">
+                           View
+                        </Link>
+                        
+                        <Link to={`/post/${post.id}`}>
+                           <Button variant="ghost" size="sm" className="flex items-center gap-2 text-gray-500 hover:text-blue-600">
+                              <MessageSquare className="w-4 h-4" />
+                              Comment
+                           </Button>
+                        </Link>
+                      </div>
 
                       {user && user.id === post.user_id && (
-                        <div className="flex gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(post)}>
-                            Edit
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(post.id)}>
-                            Delete
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                              <span className="sr-only">Open menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(post)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDelete(post.id)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       )}
                     </CardFooter>
                   </div>

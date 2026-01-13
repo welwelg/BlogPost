@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/services/supabase';
 import type { Post } from '@/features/posts/postsSlice'; 
 import { MoveLeft } from 'lucide-react';
+import CommentSection from '@/components/CommentSection';
 
 const PostDetails = () => {
   const { id } = useParams();
@@ -70,6 +71,9 @@ const PostDetails = () => {
           </div>
         </CardContent>
       </Card>
+      
+      {/* COMMENT SECTION */}
+      {post && <CommentSection postId={post.id} />}
 
       <Button variant="outline" onClick={() => navigate('/dashboard')} className="mt-4">
         <MoveLeft/>
