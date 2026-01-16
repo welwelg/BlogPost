@@ -1,3 +1,4 @@
+![Alt](https://repobeats.axiom.co/api/embed/04bdfe556def8612f1c647050272f35b6f1b9aba.svg "Repobeats analytics image")
 # React 19 Blog Assessment 🚀
 
 A full-stack blog application built as a technical assessment for the Senior Developer position. This project demonstrates proficiency in modern React patterns, centralized state management, and backend-as-a-service integration.
@@ -23,4 +24,4 @@ A full-stack blog application built as a technical assessment for the Senior Dev
 
 1. **Clone the repository**
    ```bash
-   git clone [https://github.com/YOUR_USERNAME/react-blog-assessment.git](https://github.com/YOUR_USERNAME/react-blog-assessment.git)
+   git clone [https://github.com/YOUR_USERNAME/react-blog-assessment.git](https://github.com/YOUR_USERNAME/react-blog-assessment.git)\
