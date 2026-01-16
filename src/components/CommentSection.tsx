@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '@/store/store';
-import { fetchComments, addComment, updateComment , deleteComment } from '@/features/comments/commentsSlice';
+import { fetchComments, addComment, updateComment, deleteComment } from '@/features/comments/commentsSlice';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
-import { Trash2, MessageSquare, Pencil } from "lucide-react";
-
+import { Trash2, MessageSquare, Pencil, ImageIcon, XCircle } from "lucide-react";
 
 interface CommentSectionProps {
   postId: number;
@@ -18,31 +17,52 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
   const { list } = useSelector((state: RootState) => state.comments);
   const { user } = useSelector((state: RootState) => state.auth);
   
-  // NEW COMMENT
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  // NEW COMMENT STATE
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
 
-  // EDIT COMMENT
+  // EDIT COMMENT STATE
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editContent, setEditContent] = useState('');
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     dispatch(fetchComments(postId));
   }, [dispatch, postId]);
 
+  //Format Date nicely
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim() || !user || !user.email) return;
+    if ((!content.trim() && !imageFile) || !user || !user.email) return;
 
     setIsSubmitting(true);
     await dispatch(addComment({ 
       postId, 
       content, 
       userId: user.id, 
-      userEmail: user.email 
+      userEmail: user.email,
+      imageFile: imageFile || undefined 
     }));
     
     setContent('');
+    setImageFile(null);
+    if(fileInputRef.current) fileInputRef.current.value = '';
+    
     setIsSubmitting(false);
     toast.success("Comment added!");
   };
@@ -54,24 +74,43 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
+  };
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setEditImageFile(e.target.files[0]);
+    }
+  };
+
   const startEditing = (id: number, currentContent: string) => {
     setEditingId(id);
     setEditContent(currentContent);
+    setEditImageFile(null);
   };
 
   const handleUpdate = async () => {
     if (!editContent.trim() || !editingId) return;
     
-    await dispatch(updateComment({ id: editingId, content: editContent }));
+    await dispatch(updateComment({ 
+        id: editingId, 
+        content: editContent,
+        imageFile: editImageFile 
+    }));
+    
     setEditingId(null);
     setEditContent('');
+    setEditImageFile(null);
     toast.success("Comment updated!");
   };
 
-  // CANCEL EDIT FUNCTION
   const cancelEdit = () => {
     setEditingId(null);
     setEditContent('');
+    setEditImageFile(null);
   };
 
   return (
@@ -85,14 +124,61 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
       {user ? (
         <form onSubmit={handleSubmit} className="mb-8 space-y-4">
           <Textarea 
-            placeholder="What are your thoughts?" 
+            placeholder={editingId ? "Finish editing first..." : "What are your thoughts?"}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="min-h-25"
+            disabled={!!editingId}
           />
-          <Button type="submit" disabled={isSubmitting || !content.trim()}>
-            {isSubmitting ? 'Posting...' : 'Post Comment'}
-          </Button>
+
+          {imageFile && (
+            <div className="relative w-fit">
+              <img 
+                src={URL.createObjectURL(imageFile)} 
+                alt="Preview" 
+                className="h-20 w-20 object-cover rounded-md border"
+              />
+              <button 
+                type="button"
+                aria-label="Remove image preview"
+                onClick={() => {
+                   setImageFile(null);
+                   if(fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                className="absolute -top-2 -right-2 bg-white rounded-full text-red-500 shadow-sm hover:text-red-700"
+              >
+                <XCircle className="w-5 h-5 fill-current" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center">
+            <div>
+              <input 
+                type="file" 
+                ref={fileInputRef}
+                className="hidden" 
+                accept="image/*"
+                onChange={handleFileChange}
+                aria-label="Attach image"
+                disabled={!!editingId}
+              />
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                className="gap-2 text-gray-600"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!!editingId}
+              >
+                <ImageIcon className="w-4 h-4" />
+                {imageFile ? "Change Image" : "Add Image"}
+              </Button>
+            </div>
+            <Button type="submit" disabled={isSubmitting || (!content.trim() && !imageFile) || !!editingId}>
+              {isSubmitting ? 'Posting...' : 'Post Comment'}
+            </Button>
+          </div>
         </form>
       ) : (
         <div className="bg-gray-100 p-4 rounded-lg mb-8 text-center text-gray-600">
@@ -118,14 +204,19 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
                     <span className="font-semibold text-sm block">
                       {comment.user_email?.split('@')[0]}
                     </span>
-                    <span className="text-xs text-gray-500">
-                      {new Date(comment.created_at).toLocaleDateString()}
+                    {/* Date & Edit Time Display */}
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      {formatDate(comment.created_at)}
+                      {comment.updated_at && (
+                        <span className="italic text-gray-400 text-[10px] ml-1">
+                          (Edited {formatDate(comment.updated_at)})
+                        </span>
+                      )}
                     </span>
                   </div>
                   
-                  {user && user.id === comment.user_id && (
+                  {user && user.id === comment.user_id && !editingId && (
                     <div className="flex gap-1">
-                      {/* EDIT BUTTON */}
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -134,7 +225,6 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
                       >
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      {/* DELETE BUTTON */}
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -146,11 +236,56 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
                     </div>
                   )}
                 </div>
+
+                {/* SHOW ORIGINAL IMAGE If not editing) */}
+                {comment.image_url && !editingId && (
+                   <div className="mt-3 mb-2">
+                     <img 
+                       src={comment.image_url} 
+                       alt="Attachment" 
+                       className="max-h-48 rounded-lg border object-cover"
+                     />
+                   </div>
+                )}
                 
-                {/* CONTENT DISPLAY LOGIC */}
+                {/* EDIT MODE */}
                 {editingId === comment.id ? (
-                  // EDIT MODE
                   <div className="mt-2 space-y-2">
+                    
+                    {(comment.image_url || editImageFile) && (
+                      <div className="mb-2 p-2 bg-gray-100 rounded border w-fit relative">
+                        <span className="text-xs text-gray-500 mb-1 block">
+                          {editImageFile ? "New Image Selected:" : "Current Image:"}
+                        </span>
+                        <img 
+                          src={editImageFile ? URL.createObjectURL(editImageFile) : comment.image_url} 
+                          alt="Attachment preview" 
+                          className="h-24 w-auto rounded object-cover opacity-90"
+                        />
+                      </div>
+                    )}
+
+                     <div>
+                      <input 
+                        type="file" 
+                        ref={editFileInputRef}
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleEditFileChange}
+                        aria-label="Change comment image"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm"
+                        className="gap-2 text-xs h-7 mb-2"
+                        onClick={() => editFileInputRef.current?.click()}
+                      >
+                        <ImageIcon className="w-3 h-3" />
+                        {(editImageFile || comment.image_url) ? "Change Image" : "Add Image"}
+                      </Button>
+                    </div>
+
                     <Textarea 
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
@@ -161,16 +296,16 @@ const CommentSection = ({ postId }: CommentSectionProps) => {
                          Save
                       </Button>
                       <Button size="sm" variant="outline" onClick={cancelEdit} className="flex gap-1">
-                        Cancel
+                         Cancel
                       </Button>
                     </div>
                   </div>
                 ) : (
-                <p className="mt-2 text-gray-700 text-sm whitespace-pre-wrap">
-                  {comment.content}
-                </p>
-
+                  <p className="mt-1 text-gray-700 text-sm whitespace-pre-wrap">
+                    {comment.content}
+                  </p>
                 )}
+                
               </div>
             </div>
           ))

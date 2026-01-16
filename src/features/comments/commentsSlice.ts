@@ -7,7 +7,9 @@ export interface Comment {
   post_id: number;
   user_id: string;
   user_email: string;
+  image_url?: string;
   created_at: string;
+  updated_at?: string; 
 }
 
 interface CommentsState {
@@ -22,7 +24,23 @@ const initialState: CommentsState = {
   error: null,
 };
 
-//  FETCH COMMENTS (By Post ID)
+// Upload Image Function
+const uploadCommentImage = async (file: File) => {
+  const fileName = `comment-${Date.now()}-${file.name}`;
+  const { error } = await supabase.storage
+    .from('blog-images')
+    .upload(fileName, file);
+
+  if (error) throw new Error(error.message);
+
+  const { data: { publicUrl } } = supabase.storage
+    .from('blog-images')
+    .getPublicUrl(fileName);
+
+  return publicUrl;
+};
+
+// FETCH COMMENTS
 export const fetchComments = createAsyncThunk(
   'comments/fetchComments',
   async (postId: number, { rejectWithValue }) => {
@@ -30,45 +48,70 @@ export const fetchComments = createAsyncThunk(
       .from('comments')
       .select('*')
       .eq('post_id', postId)
-      .order('created_at', { ascending: true }); // Oldest first
+      .order('created_at', { ascending: true });
 
     if (error) return rejectWithValue(error.message);
     return data;
   }
 );
 
-//  ADD COMMENT
+// ADD COMMENT
 export const addComment = createAsyncThunk(
   'comments/addComment',
-  async ({ postId, content, userId, userEmail }: { postId: number, content: string, userId: string, userEmail: string }, { rejectWithValue }) => {
-    const { data, error } = await supabase
-      .from('comments')
-      .insert([{ post_id: postId, content, user_id: userId, user_email: userEmail }])
-      .select()
-      .single();
+  async ({ postId, content, userId, userEmail, imageFile }: { postId: number, content: string, userId: string, userEmail: string, imageFile?: File | undefined }, { rejectWithValue }) => {
+    try {
+      let imageUrl = null;
+      if (imageFile) {
+        imageUrl = await uploadCommentImage(imageFile);
+      }
 
-    if (error) return rejectWithValue(error.message);
-    return data;
+      const { data, error } = await supabase
+        .from('comments')
+        .insert([{ post_id: postId, content, user_id: userId, user_email: userEmail, image_url: imageUrl }])
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+      return data;
+    } catch (err) {
+      if (err instanceof Error) return rejectWithValue(err.message);
+      return rejectWithValue('An unknown error occurred');
+    }
   }
 );
 
-//  UPDATE COMMENT
+// UPDATE COMMENT/
 export const updateComment = createAsyncThunk(
   'comments/updateComment',
-  async ({ id, content }: { id: number, content: string }, { rejectWithValue }) => {
-    const { data, error } = await supabase
-      .from('comments')
-      .update({ content })
-      .eq('id', id)
-      .select()
-      .single();
+  async ({ id, content, imageFile }: { id: number, content: string, imageFile?: File | null }, { rejectWithValue }) => {
+    try {
+      const updates: { content: string; image_url?: string; updated_at: string } = { 
+        content,
+        updated_at: new Date().toISOString()
+      };
 
-    if (error) return rejectWithValue(error.message);
-    return data;
+      if (imageFile) {
+        const imageUrl = await uploadCommentImage(imageFile);
+        updates.image_url = imageUrl;
+      }
+
+      const { data, error } = await supabase
+        .from('comments')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+      return data;
+    } catch (err) {
+      if (err instanceof Error) return rejectWithValue(err.message);
+      return rejectWithValue('An unknown error occurred');
+    }
   }
 );
 
-//  DELETE COMMENT
+// DELETE COMMENT
 export const deleteComment = createAsyncThunk(
   'comments/deleteComment',
   async (commentId: number, { rejectWithValue }) => {
